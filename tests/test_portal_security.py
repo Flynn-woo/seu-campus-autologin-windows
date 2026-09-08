@@ -199,7 +199,7 @@ def test_submit_login_fills_expected_fields_and_succeeds(monkeypatch) -> None:
     page = FakePage()
     logger = SimpleNamespace(info=lambda *args: None, debug=lambda *args: None)
     monkeypatch.setattr(portal, "edge_available", lambda: True)
-    monkeypatch.setattr(portal, "portal_state", lambda page: "login")
+    monkeypatch.setattr(portal, "portal_state", lambda page, **kwargs: "login")
     monkeypatch.setattr(portal, "sync_playwright", lambda: FakePlaywrightManager(page))
     monkeypatch.setattr(portal, "internet_available", lambda timeout=3: True)
     result = portal.submit_login(Credential("student", "secret"), logger)
@@ -212,7 +212,7 @@ def test_submit_login_fills_expected_fields_and_succeeds(monkeypatch) -> None:
 def test_submit_login_reports_explicit_failure_without_retry(monkeypatch) -> None:
     page = FakePage(body_text="用户名或密码错误")
     logger = SimpleNamespace(info=lambda *args: None, debug=lambda *args: None)
-    ticks = iter([0.0, 36.0])
+    ticks = iter([0.0, 46.0])
     monkeypatch.setattr(portal, "edge_available", lambda: True)
     monkeypatch.setattr(portal, "portal_state", lambda page: "login")
     monkeypatch.setattr(portal, "sync_playwright", lambda: FakePlaywrightManager(page))
@@ -232,3 +232,20 @@ def test_inspect_portal_state_handles_success_and_missing_edge(monkeypatch) -> N
     monkeypatch.setattr(portal, "portal_state", lambda page: "authenticated")
     monkeypatch.setattr(portal, "sync_playwright", lambda: FakePlaywrightManager(page))
     assert portal.inspect_portal_state() == "authenticated"
+
+
+def test_authenticated_result_page_succeeds_even_when_external_probes_fail(monkeypatch):
+    page = FakePage()
+    states = iter(["login", "authenticated"])
+    monkeypatch.setattr(portal, "edge_available", lambda: True)
+    monkeypatch.setattr(portal, "portal_state", lambda page, **kwargs: next(states))
+    monkeypatch.setattr(portal, "sync_playwright", lambda: FakePlaywrightManager(page))
+    monkeypatch.setattr(portal, "internet_available", lambda timeout=3: False)
+    logger = SimpleNamespace(info=lambda *args: None, debug=lambda *args: None)
+    result = portal.submit_login(Credential("test", "test"), logger)
+    assert result.submitted and result.gateway_authenticated
+    assert not result.explicit_failure
+
+
+def test_malformed_port_is_rejected_without_exception():
+    assert not is_allowed_portal_url("http://10.9.10.100:invalid/")

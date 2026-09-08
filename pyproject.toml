@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seu-campus-autologin-windows"
-version = "0.1.0"
+version = "0.1.1"
 description = "面向 Windows 的东南大学校园网自动认证工具"
 readme = "README.md"
 requires-python = ">=3.10"

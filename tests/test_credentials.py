@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 from seu_autologin import credentials
+from seu_autologin.automatic import automatic_paused, pause_automatic
 
 
 def test_normalize_username() -> None:
@@ -78,7 +79,9 @@ def test_save_writes_public_target(monkeypatch) -> None:
         "_win32_modules",
         lambda: (SimpleNamespace(error=FakePyWinError), fake),
     )
+    pause_automatic()
     credentials.save_credential("  user@xyw ", "secret")
+    assert not automatic_paused()
     value, flags = fake.written
     assert value["TargetName"] == "SEUCampusAutoLoginOSS/SEU-WLAN"
     assert value["UserName"] == "user"

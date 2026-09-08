@@ -16,4 +16,6 @@ if errorlevel 2 goto END
 "%APP_EXE%" run-once --initial-delay 0
 
 :END
+"%APP_EXE%" diagnose
+echo 如需反馈问题，请提供上方诊断报告，无需发送账号和密码。
 pause
