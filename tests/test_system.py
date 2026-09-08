@@ -1,6 +1,9 @@
 """公开版系统集成边界测试。"""
 
-from types import SimpleNamespace
+import os
+import uuid
+
+import pytest
 
 from seu_autologin import system
 
@@ -36,11 +39,11 @@ def test_mutex_creation_and_release(monkeypatch) -> None:
         def CloseHandle(self, handle):
             calls.append(("close", handle))
 
-    monkeypatch.setattr(system.ctypes, "windll", SimpleNamespace(kernel32=Kernel32()))
+    monkeypatch.setattr(system, "_kernel32", lambda: Kernel32())
     handle = system.acquire_single_instance()
     assert handle == 123
     system.release_single_instance(handle)
-    assert calls == ["create", ("release", 123), ("close", 123)]
+    assert calls == ["create", ("close", 123)]
 
 
 def test_existing_mutex_returns_none(monkeypatch) -> None:
@@ -56,7 +59,7 @@ def test_existing_mutex_returns_none(monkeypatch) -> None:
         def CloseHandle(self, handle):
             calls.append(handle)
 
-    monkeypatch.setattr(system.ctypes, "windll", SimpleNamespace(kernel32=Kernel32()))
+    monkeypatch.setattr(system, "_kernel32", lambda: Kernel32())
     assert system.acquire_single_instance() is None
     assert calls == [456]
 
@@ -78,3 +81,17 @@ def test_open_manual_portal_uses_edge(monkeypatch, tmp_path) -> None:
 def test_open_manual_portal_rejects_modified_constant(monkeypatch) -> None:
     monkeypatch.setattr(system, "PORTAL_URL", "http://example.com/")
     assert not system.open_manual_portal()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="仅 Windows 使用原生命名互斥量")
+def test_real_windows_mutex_lifetime_and_reacquisition(monkeypatch):
+    monkeypatch.setattr(system, "MUTEX_NAME", "Local\\SEU-TEST-" + uuid.uuid4().hex)
+    first = system.acquire_single_instance()
+    assert first is not None
+    try:
+        assert system.acquire_single_instance() is None
+    finally:
+        system.release_single_instance(first)
+    second = system.acquire_single_instance()
+    assert second is not None
+    system.release_single_instance(second)

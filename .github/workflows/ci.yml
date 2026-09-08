@@ -30,3 +30,9 @@ jobs:
 
       - name: 单元测试
         run: python -m pytest --cov=seu_autologin --cov-report=term-missing
+
+      - name: Windows PowerShell 5.1 安装逻辑测试
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_autostart.ps1
+
+      - name: PowerShell 7 安装逻辑测试
+        run: pwsh -NoProfile -File tests/test_autostart.ps1

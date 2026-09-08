@@ -3,6 +3,7 @@
 import ctypes
 import os
 import subprocess
+from ctypes import wintypes
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -21,13 +22,25 @@ def edge_available() -> bool:
     return edge_path() is not None
 
 
-def acquire_single_instance() -> object | None:
+def _kernel32():
+    """声明 HANDLE 宽度，避免 64 位 Windows 上默认的 int 截断。"""
+
+    kernel32 = ctypes.windll.kernel32
+    kernel32.CreateMutexW.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
+    kernel32.CreateMutexW.restype = wintypes.HANDLE
+    kernel32.GetLastError.restype = wintypes.DWORD
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    return kernel32
+
+
+def acquire_single_instance(suffix: str = "") -> object | None:
     """使用公开版专属命名互斥量，避免重复运行。"""
 
     if os.name != "nt":
         return object()
-    kernel32 = ctypes.windll.kernel32
-    handle = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+    kernel32 = _kernel32()
+    handle = kernel32.CreateMutexW(None, False, MUTEX_NAME + suffix)
     if not handle:
         return None
     if kernel32.GetLastError() == 183:
@@ -40,8 +53,8 @@ def release_single_instance(handle: object | None) -> None:
     """释放命名互斥量。"""
 
     if handle and os.name == "nt":
-        ctypes.windll.kernel32.ReleaseMutex(handle)
-        ctypes.windll.kernel32.CloseHandle(handle)
+        # CreateMutexW 未请求所有权；关闭句柄即可释放命名实例。
+        _kernel32().CloseHandle(handle)
 
 
 def open_manual_portal() -> bool:

@@ -18,11 +18,12 @@ def is_allowed_portal_url(url: str) -> bool:
 
     try:
         parts = urlsplit(url)
+        port = parts.port
     except ValueError:
         return False
     if parts.scheme != "http" or parts.hostname != PORTAL_HOST:
         return False
-    if parts.port not in (None, 80):
+    if port not in (None, 80):
         return False
     return parts.username is None and parts.password is None
 
@@ -126,10 +127,21 @@ def submit_login(credential: Credential, logger: logging.Logger) -> LoginResult:
                 page.locator('input[name="0MKKey"][type="submit"]').click()
                 logger.info("已向固定认证网关 %s 提交登录请求。", PORTAL_HOST)
 
-                deadline = time.monotonic() + 35
+                deadline = time.monotonic() + 45
                 while time.monotonic() < deadline:
+                    state = portal_state(page, timeout_ms=500)
+                    if state == "authenticated":
+                        return LoginResult(
+                            True, False, "认证网关已确认登录成功。", gateway_authenticated=True,
+                        )
+                    if state == "blocked":
+                        return LoginResult(True, True, "认证结果页离开固定主机，已阻止。")
                     if internet_available(timeout=3):
                         return LoginResult(True, False, "校园网认证成功。")
+                    if _body_indicates_failure(page.locator("body").inner_text(timeout=5_000)):
+                        return LoginResult(
+                            True, True, "认证服务器拒绝登录，请核对账号、密码或套餐状态。",
+                        )
                     page.wait_for_timeout(2_500)
 
                 body_text = page.locator("body").inner_text(timeout=5_000)

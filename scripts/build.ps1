@@ -16,7 +16,8 @@ $ReleaseDir = Join-Path $ProjectRoot "release"
 $PackageName = "SEUCampusAutoLoginOSS-$Version-windows-x64"
 $PackageDir = Join-Path $ReleaseDir $PackageName
 
-foreach ($Target in @($BuildDir, $DistDir, $ReleaseDir)) {
+# 保留历史版本，只清理本次构建与当前版本的解压目录。
+foreach ($Target in @($BuildDir, $DistDir, $PackageDir)) {
     $FullTarget = [IO.Path]::GetFullPath($Target)
     $FullRoot = [IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\') + '\'
     if (-not $FullTarget.StartsWith($FullRoot, [StringComparison]::OrdinalIgnoreCase)) {
@@ -30,16 +31,9 @@ foreach ($Target in @($BuildDir, $DistDir, $ReleaseDir)) {
 & $PythonExe -m PyInstaller `
     --noconfirm `
     --clean `
-    --onedir `
-    --console `
-    --name SEUCampusAutoLoginOSS `
-    --paths (Join-Path $ProjectRoot "src") `
-    --collect-all playwright `
-    --hidden-import win32timezone `
     --distpath $DistDir `
     --workpath $BuildDir `
-    --specpath $BuildDir `
-    (Join-Path $ProjectRoot "packaging\entrypoint.py")
+    (Join-Path $ProjectRoot "packaging\windows.spec")
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller 构建失败。"
 }
@@ -59,9 +53,10 @@ foreach ($Name in @(
 Copy-Item -LiteralPath (Join-Path $ProjectRoot ".github\SECURITY.md") -Destination (Join-Path $PackageDir "SECURITY.md") -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "docs\PRIVACY.md") -Destination (Join-Path $PackageDir "PRIVACY.md") -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "docs\THIRD_PARTY_NOTICES.md") -Destination (Join-Path $PackageDir "THIRD_PARTY_NOTICES.md") -Force
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "docs") -Destination (Join-Path $PackageDir "docs") -Recurse -Force
 
 $ZipPath = Join-Path $ReleaseDir "$PackageName.zip"
-Compress-Archive -LiteralPath $PackageDir -DestinationPath $ZipPath -CompressionLevel Optimal
+Compress-Archive -LiteralPath $PackageDir -DestinationPath $ZipPath -CompressionLevel Optimal -Force
 $Hash = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath "$ZipPath.sha256" -Value "$Hash  $PackageName.zip" -Encoding ascii
 

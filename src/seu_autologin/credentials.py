@@ -5,6 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from .automatic import resume_automatic
 from .constants import CREDENTIAL_TARGET
 from .models import Credential
 
@@ -48,6 +49,7 @@ def save_credential(username: str, password: str) -> None:
         },
         0,
     )
+    resume_automatic()
 
 
 def load_credential() -> Credential | None:
